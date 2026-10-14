@@ -363,7 +363,8 @@ do
   vim.keymap.set('n', '<S-h>', '<cmd>bprevious<CR>', { desc = 'Prev buffer' })
   -- - Shift+l for right buffer
   vim.keymap.set('n', '<S-l>', '<cmd>bnext<CR>', { desc = 'Next buffer' })
-  -- - Space bd for deletion buffer
+
+  -- Space bd for deletion buffer
   require('mini.bufremove').setup()
   vim.keymap.set('n', '<leader>bd', function() MiniBufremove.delete() end, { desc = '[B]uffer [D]elete' })
 
@@ -613,6 +614,7 @@ do
     { src = gh 'nvim-neo-tree/neo-tree.nvim', version = vim.version.range '3.*' },
   }
   require('neo-tree').setup {
+    sources = { 'filesystem', 'buffers', 'git_status', 'wslremote.neotree' },
     filesystem = {
       window = {
         mappings = { ['\\\\'] = 'close_window' },
@@ -631,8 +633,12 @@ do
       },
     },
   }
-  -- Toggle neo-tree by \\
-  vim.keymap.set('n', '\\\\', '<cmd>Neotree reveal<CR>', { desc = 'NeoTree reveal', silent = true })
+  -- Toggle neo-tree by \
+  vim.keymap.set('n', '\\', function()
+    if not require('wslremote.neotree').reveal() then
+      vim.cmd('Neotree reveal')
+    end
+  end, { desc = 'NeoTree reveal', silent = true })
 
   -- Powershell
   vim.o.shell = vim.fn.executable('pwsh') == 1 and 'pwsh' or 'powershell'
