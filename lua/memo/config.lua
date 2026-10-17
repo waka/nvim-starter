@@ -31,6 +31,24 @@ M.defaults = {
     exit_timeout = 5, -- 終了時の push を待つ最大秒数
     notify_pull = true, -- リモートの変更を取り込んだら通知
     commit_message = "memo: %Y-%m-%d %H:%M", -- os.date 形式
+    conflict = "stop", -- 競合したら "stop": 自動同期を止める / "copy": 相手の版を採用し自分の版を別メモに残す
+  },
+  -- 共有（家族・チームと共有するリポジトリ。管理フォルダの中の shared/ に置く）
+  shared = {
+    enabled = true,
+    dir = "shared", -- 管理フォルダの中のフォルダ名
+    label = "共有", -- 一覧ペインの見出し
+    sync = {
+      auto = true,
+      delay = 5, -- 最後の変更から何秒待って同期するか
+      poll = 120, -- 何秒おきにほかの人の変更を取り込むか（0 で無効）
+      pull_on_open = true,
+      push_on_exit = true,
+      exit_timeout = 5,
+      notify_pull = true,
+      commit_message = "shared: %Y-%m-%d %H:%M",
+      conflict = "copy",
+    },
   },
   -- :MTClaude（管理フォルダで Claude Code を開く）
   claude = {
@@ -62,7 +80,7 @@ M.defaults = {
     width = 32,
     -- 上から並べる段。"daily" を入れるとデイリーが独立した段になる。
     -- 入れなければ Memo の段の中に開閉できる「Daily」フォルダとして出る
-    sections = { "memo", "todo" },
+    sections = { "memo", "todo", "shared" },
     daily_expanded = false, -- Daily フォルダを最初から開いておくか
     icons = { open = "▾", closed = "▸" },
   },

@@ -18,8 +18,9 @@ local function open(path, cursor_to_end)
 end
 
 --- 新規作成（同名があれば開くだけ）
-function M.new(kind, title)
-  local path, created, existing = store.create(kind, title)
+--- @param o table|nil { shared = true } で共有に作る
+function M.new(kind, title, o)
+  local path, created, existing = store.create(kind, title, o)
   if not path then
     vim.notify("memo: タイトルを入力してください", vim.log.levels.WARN)
     return
@@ -41,6 +42,38 @@ local function new_with_prompt(kind, title)
       M.new(kind, input)
     end
   end)
+end
+
+--- 個人 ⇔ 共有 を移す
+function M.move(path, to_shared)
+  if to_shared and not git.shared:is_repo() then
+    vim.notify("memo: 先に :MTSync init-shared <URL> で共有リポジトリを設定してください", vim.log.levels.WARN)
+    return
+  end
+  local title = vim.fn.fnamemodify(path, ":t:r")
+  local msg = to_shared and ("「%s」を共有に移動しますか？共有している全員から見えるようになります"):format(title)
+    or ("「%s」を共有から外して個人のメモに戻しますか？ほかの人の手元からは消えます"):format(title)
+  if not require("memo.util").confirm(msg) then
+    return
+  end
+  local dest, err = store.move(path, to_shared)
+  if not dest then
+    vim.notify("memo: " .. err, vim.log.levels.ERROR)
+    return
+  end
+  vim.notify(("memo: 「%s」を%sしました"):format(title, to_shared and "共有に移動" or "個人のメモに戻"))
+  sidebar.refresh()
+  return dest
+end
+
+--- 今のバッファのメモを共有に移す / 戻す
+local function move_current()
+  local path = store.normalize(vim.api.nvim_buf_get_name(0))
+  if not store.is_memo_path(path) then
+    vim.notify("memo: メモを開いてから実行してください", vim.log.levels.WARN)
+    return
+  end
+  M.move(path, not store.is_shared_path(path))
 end
 
 --- 今日のメモを開く / 作る
@@ -78,6 +111,8 @@ local function command(kind, subs)
       return require("memo.link").insert(false)
     elseif sub == "b" then
       return require("memo.link").backlinks()
+    elseif sub == "s" then
+      return move_current()
     end
     vim.notify(("memo: 使い方 :%s [%s] [タイトル]"):format(LABEL[kind] == "Memo" and "Memo" or "Todo", table.concat(subs, "|")), vim.log.levels.ERROR)
   end
@@ -97,11 +132,11 @@ end
 function M.setup(opts)
   config.setup(opts)
 
-  local memo_subs, todo_subs = { "n", "d", "g", "l", "b" }, { "n", "g", "l", "b" }
+  local memo_subs, todo_subs = { "n", "d", "g", "l", "b", "s" }, { "n", "g", "l", "b", "s" }
   vim.api.nvim_create_user_command("Memo", command("memo", memo_subs), {
     nargs = "*",
     complete = complete(memo_subs),
-    desc = "メモ一覧 / n タイトル: 新規 / d: 今日のメモ / g: 本文検索 / l: リンク挿入 / b: バックリンク",
+    desc = "メモ一覧 / n タイトル: 新規 / d: 今日のメモ / g: 本文検索 / l: リンク挿入 / b: バックリンク / s: 共有に移動・戻す",
   })
   vim.api.nvim_create_user_command("Todo", command("todo", todo_subs), {
     nargs = "*",
@@ -118,14 +153,16 @@ function M.setup(opts)
   vim.api.nvim_create_user_command("MTSync", function(args)
     if args.fargs[1] == "init" then
       return git.init(args.fargs[2])
+    elseif args.fargs[1] == "init-shared" then
+      return git.init_shared(args.fargs[2])
     end
     git.sync(true)
   end, {
     nargs = "*",
     complete = function(_, cmdline)
-      return #vim.split(vim.trim(cmdline), "%s+") <= 1 and { "init" } or {}
+      return #vim.split(vim.trim(cmdline), "%s+") <= 1 and { "init", "init-shared" } or {}
     end,
-    desc = "メモを git リモートと同期 / init <URL>: リポジトリを設定",
+    desc = "メモを git リモートと同期 / init <URL>: 個人 / init-shared <URL>: 共有",
   })
 
   local group = vim.api.nvim_create_augroup("memo.nvim", { clear = true })
@@ -150,9 +187,16 @@ function M.setup(opts)
         store.sync_filename(ev.buf)
       end
       sidebar.refresh()
-      git.schedule()
+      git.schedule(vim.api.nvim_buf_get_name(ev.buf))
     end,
   })
+  vim.api.nvim_create_autocmd("FocusGained", {
+    group = group,
+    callback = function()
+      git.on_focus()
+    end,
+  })
+  git.start_poll()
   vim.api.nvim_create_autocmd("VimLeavePre", {
     group = group,
     callback = function()

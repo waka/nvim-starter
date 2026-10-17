@@ -60,7 +60,7 @@ function M.toggle_in_file(path, lnum)
   if lines[lnum] then
     lines[lnum] = M.toggle_line(lines[lnum])
     vim.fn.writefile(lines, path)
-    require("memo.git").schedule()
+    require("memo.git").schedule(path)
   end
 end
 

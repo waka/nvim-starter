@@ -36,7 +36,7 @@ function M.system_prompt()
     "ユーザーはメモや ToDo を書かせたり、メモの内容について質問したりします。",
     "",
     "## ファイルの形式",
-    "- すべて Markdown（.md）で、このフォルダの直下に置く。サブフォルダは作らない",
+    "- すべて Markdown（.md）で、このフォルダの直下に置く。サブフォルダは作らない（下の共有フォルダを除く）",
     "- ファイル名はタイトルそのまま（例: `買い物.md`）。ただし / \\ : * ? \" < > | は _ に置き換える",
     "- 先頭に frontmatter を付ける。title はファイル名（拡張子なし）と同じにする",
     "",
@@ -72,6 +72,12 @@ function M.system_prompt()
     "- 他のメモへのリンクは `[[タイトル]]` と書く（見出しへは `[[タイトル#見出し]]`、表示名を変えるなら `[[タイトル|表示名]]`）",
     "- 関連するメモがあれば、積極的にリンクを張る",
     "",
+    "## 共有フォルダ",
+    ("- `%s/` は家族・チームと共有しているフォルダ。中身は同じ形式のメモ / ToDo"):format(config.options.shared.dir),
+    "- 頼まれたとき（「共有に」「家族と」など）だけ、ここにファイルを作る・移す。個人のメモを勝手に共有へ移さない",
+    "- 共有のメモから個人のメモへリンクを張らない（ほかの人は開けない）",
+    "- 質問に答えるときは、共有フォルダのメモも検索の対象にする",
+    "",
     "## 質問に答えるとき",
     "- `[[タイトル]]` のリンクも辿って関連するメモを読む",
     "- このフォルダのメモを検索して読み、根拠にしたファイル名を添えて答える",
@@ -106,29 +112,39 @@ local function start_watch()
   if state.watcher then
     return
   end
-  local w = vim.uv.new_fs_event()
-  if not w then
-    return
-  end
+  state.watcher = {}
   state.debounce = vim.uv.new_timer()
-  local ok = w:start(config.options.dir, {}, function(err, filename)
-    if err or not filename or not filename:match("%.md$") then
-      return
+  local store = require("memo.store")
+  local dirs = { config.options.dir }
+  if store.shared_enabled() then
+    vim.fn.mkdir(store.shared_dir(), "p")
+    table.insert(dirs, store.shared_dir())
+  end
+  for _, d in ipairs(dirs) do
+    local w = vim.uv.new_fs_event()
+    if w then
+      local ok = w:start(d, {}, function(err, filename)
+        if err or not filename or not filename:match("%.md$") then
+          return
+        end
+        state.debounce:stop()
+        state.debounce:start(300, 0, vim.schedule_wrap(on_change))
+      end)
+      if ok then
+        table.insert(state.watcher, w)
+      else
+        w:close()
+      end
     end
-    state.debounce:stop()
-    state.debounce:start(300, 0, vim.schedule_wrap(on_change))
-  end)
-  if ok then
-    state.watcher = w
-  else
-    w:close()
   end
 end
 
 local function stop_watch()
   if state.watcher then
-    state.watcher:stop()
-    state.watcher:close()
+    for _, w in ipairs(state.watcher) do
+      w:stop()
+      w:close()
+    end
     state.watcher = nil
   end
   if state.debounce then

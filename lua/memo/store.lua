@@ -20,8 +20,18 @@ function M.sanitize(title)
   return s
 end
 
-function M.path_for(title)
-  return M.dir() .. "/" .. M.sanitize(title) .. ".md"
+--- 共有フォルダ（管理フォルダの中の shared/）
+function M.shared_enabled()
+  return config.options.shared and config.options.shared.enabled
+end
+
+function M.shared_dir()
+  return M.dir() .. "/" .. config.options.shared.dir
+end
+
+--- @param dir string|nil 省略時は個人の管理フォルダ
+function M.path_for(title, dir)
+  return (dir or M.dir()) .. "/" .. M.sanitize(title) .. ".md"
 end
 
 function M.normalize(path)
@@ -35,7 +45,15 @@ function M.is_memo_path(path)
   if not path or path == "" or not path:match("%.md$") then
     return false
   end
-  return vim.fs.dirname(M.normalize(path)) == M.dir()
+  local d = vim.fs.dirname(M.normalize(path))
+  return d == M.dir() or (M.shared_enabled() and d == M.shared_dir())
+end
+
+function M.is_shared_path(path)
+  if not path or path == "" or not M.shared_enabled() then
+    return false
+  end
+  return vim.fs.dirname(M.normalize(path)) == M.shared_dir()
 end
 
 function M.exists(path)
@@ -147,22 +165,29 @@ end
 
 M.is_complete = is_complete
 
+-- 個人と共有の両方を返す。共有のものは item.shared = true
 -- @return { memo = {...}, todo = {...} }
 function M.list_all(keep_lines)
   local res = { memo = {}, todo = {} }
-  local dir = M.dir()
-  if not M.exists(dir) then
-    return res
-  end
   local ignore = {}
   for _, n in ipairs(config.options.ignore or {}) do
     ignore[n] = true
   end
-  for name, t in vim.fs.dir(dir) do
-    if (t == "file" or t == "link") and name:match("%.md$") and not ignore[name] then
-      local item = M.read(dir .. "/" .. name, keep_lines)
-      if item then
-        table.insert(res[item.type], item)
+  local dirs = { { M.dir(), false } }
+  if M.shared_enabled() then
+    table.insert(dirs, { M.shared_dir(), true })
+  end
+  for _, d in ipairs(dirs) do
+    local dir, shared = d[1], d[2]
+    if M.exists(dir) then
+      for name, t in vim.fs.dir(dir) do
+        if (t == "file" or t == "link") and name:match("%.md$") and not ignore[name] then
+          local item = M.read(dir .. "/" .. name, keep_lines)
+          if item then
+            item.shared = shared
+            table.insert(res[item.type], item)
+          end
+        end
       end
     end
   end
@@ -251,13 +276,15 @@ end
 
 -- 新規作成。既にあれば作らない
 -- @return path, created(boolean), existing_type
-function M.create(kind, title)
+-- @param o table|nil { shared = true } で共有フォルダに作る
+function M.create(kind, title, o)
   title = vim.trim(title or "")
   if title == "" then
     return nil, false
   end
-  M.ensure_dir()
-  local path = M.path_for(title)
+  local dir = (o and o.shared) and M.shared_dir() or M.dir()
+  vim.fn.mkdir(dir, "p")
+  local path = M.path_for(title, dir)
   if M.exists(path) then
     local item = M.read(path)
     return path, false, item and item.type
@@ -272,7 +299,7 @@ function M.create(kind, title)
     kind == "todo" and "- [ ] " or "",
   }
   vim.fn.writefile(lines, path)
-  require("memo.git").schedule()
+  require("memo.git").schedule(path)
   return path, true
 end
 
@@ -304,8 +331,52 @@ function M.delete(path)
   end
   -- os.remove も Windows では日本語のパスを扱えない
   local ok = vim.uv.fs_unlink(path)
-  require("memo.git").schedule()
+  require("memo.git").schedule(path)
   return ok
+end
+
+--- 個人 ⇔ 共有 のあいだでファイルを移す
+--- @return string|nil 新しいパス, string|nil エラー
+function M.move(path, to_shared)
+  path = M.normalize(path)
+  local dir = to_shared and M.shared_dir() or M.dir()
+  local dest = dir .. "/" .. vim.fn.fnamemodify(path, ":t")
+  if dest == path then
+    return nil, "すでに移動先にあります"
+  end
+  if M.exists(dest) then
+    return nil, ("移動先に同じ名前の %s があります"):format(vim.fn.fnamemodify(dest, ":t"))
+  end
+  vim.fn.mkdir(dir, "p")
+  local buf = find_buf(path)
+  if buf and vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].modified then
+    vim.api.nvim_buf_call(buf, function()
+      vim.cmd("silent noautocmd write")
+    end)
+  end
+  local ok, err = vim.uv.fs_rename(path, dest)
+  if not ok then
+    -- 別ドライブなどで rename できなければコピーして消す
+    if vim.fn.writefile(vim.fn.readfile(path), dest) ~= 0 then
+      return nil, tostring(err)
+    end
+    vim.uv.fs_unlink(path)
+  end
+  if buf then
+    vim.api.nvim_buf_set_name(buf, dest)
+    vim.api.nvim_buf_call(buf, function()
+      vim.cmd("silent! noautocmd write!")
+    end)
+    for _, b in ipairs(vim.api.nvim_list_bufs()) do
+      if b ~= buf and M.normalize(vim.api.nvim_buf_get_name(b)) == path then
+        pcall(vim.api.nvim_buf_delete, b, { force = true })
+      end
+    end
+  end
+  local git = require("memo.git")
+  git.schedule(path)
+  git.schedule(dest)
+  return dest
 end
 
 -- 保存時: frontmatter の title とファイル名を揃える
@@ -318,7 +389,7 @@ function M.sync_filename(buf)
   if not meta.title or vim.trim(meta.title) == "" then
     return
   end
-  local new = M.path_for(meta.title)
+  local new = M.path_for(meta.title, vim.fs.dirname(old))
   if new == old then
     return
   end

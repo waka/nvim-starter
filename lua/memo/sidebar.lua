@@ -5,7 +5,7 @@ local store = require("memo.store")
 local M = {}
 
 local ns = vim.api.nvim_create_namespace("memo_sidebar")
-local LABEL = { memo = "Memo", daily = "Daily", todo = "ToDo" }
+local LABEL = { memo = "Memo", daily = "Daily", todo = "ToDo", shared = "共有" }
 local WEEKDAY = { "日", "月", "火", "水", "木", "金", "土" }
 
 -- section -> buf, buf -> { [lnum] = item }
@@ -17,8 +17,9 @@ local FOLDER = { folder = "daily" }
 
 local function sections()
   local res = {}
+  LABEL.shared = config.options.shared.label
   for _, s in ipairs(config.options.sidebar.sections) do
-    if LABEL[s] then
+    if LABEL[s] and (s ~= "shared" or store.shared_enabled()) then
       table.insert(res, s)
     end
   end
@@ -114,7 +115,9 @@ local function delete_item()
   if not item or item.folder then
     return
   end
-  if require("memo.util").confirm(("「%s」を削除しますか？"):format(item.title)) then
+  local msg = item.shared and ("「%s」を削除しますか？共有している全員の手元から消えます"):format(item.title)
+    or ("「%s」を削除しますか？"):format(item.title)
+  if require("memo.util").confirm(msg) then
     store.delete(item.path)
     M.refresh()
   end
@@ -128,11 +131,32 @@ local function new_item()
     require("memo").daily()
     return
   end
+  if section == "shared" then
+    return M.new_shared("memo")
+  end
   vim.ui.input({ prompt = LABEL[section] .. " タイトル: " }, function(title)
     if title and vim.trim(title) ~= "" then
       require("memo").new(section, title)
     end
   end)
+end
+
+function M.new_shared(kind)
+  local label = kind == "todo" and "共有 ToDo" or "共有メモ"
+  vim.ui.input({ prompt = label .. " タイトル: " }, function(title)
+    if title and vim.trim(title) ~= "" then
+      require("memo").new(kind, title, { shared = true })
+    end
+  end)
+end
+
+-- 個人 ⇔ 共有 を移す
+local function move_item()
+  local item = current_item()
+  if not item or item.folder then
+    return
+  end
+  require("memo").move(item.path, not item.shared)
 end
 
 -- 次の段へ（一番下なら一番上へ）
@@ -165,6 +189,14 @@ local function get_buf(section)
   map("o", open_item, "開く")
   map("d", delete_item, "削除")
   map("n", new_item, section == "daily" and "今日のメモ" or "新規作成")
+  if section == "shared" then
+    map("t", function()
+      M.new_shared("todo")
+    end, "共有 ToDo を作る")
+    map("s", move_item, "個人に戻す")
+  else
+    map("s", move_item, "共有に移動")
+  end
   map("R", M.refresh, "再読み込み")
   map("<Tab>", jump_next, "次の段へ")
   map("q", M.close, "閉じる")
@@ -215,7 +247,7 @@ local function render(section, items, daily)
     else
       text = "  " .. item.title
     end
-    if section == "todo" then
+    if item.type == "todo" then
       local prog = (" %d/%d"):format(item.done, item.total)
       if store.is_complete(item) then
         table.insert(hls, { row, 0, -1, "Comment" })
@@ -228,7 +260,13 @@ local function render(section, items, daily)
     map[#lines] = item
   end
   if #items == 0 and not daily then
-    table.insert(lines, section == "daily" and "  (なし)  n で今日のメモ" or "  (なし)  n で作成")
+    if section == "shared" and not require("memo.git").shared:is_repo() then
+      table.insert(lines, "  :MTSync init-shared <URL>")
+      table.insert(lines, "  で共有リポジトリを設定")
+      table.insert(hls, { 2, 0, -1, "Comment" })
+    else
+      table.insert(lines, section == "daily" and "  (なし)  n で今日のメモ" or "  (なし)  n で作成")
+    end
     table.insert(hls, { 1, 0, -1, "Comment" })
   end
 
@@ -268,8 +306,22 @@ function M.refresh()
     return
   end
   local all = store.list_all()
-  local daily, others = store.split_daily(all.memo)
-  local data = { todo = all.todo, daily = daily }
+  local function personal(list)
+    return vim.tbl_filter(function(i)
+      return not i.shared
+    end, list)
+  end
+  local shared = vim.tbl_filter(function(i)
+    return i.shared
+  end, vim.list_extend(vim.list_slice(all.memo), all.todo))
+  table.sort(shared, function(a, b)
+    if a.mtime ~= b.mtime then
+      return a.mtime > b.mtime
+    end
+    return a.title < b.title
+  end)
+  local daily, others = store.split_daily(personal(all.memo))
+  local data = { todo = personal(all.todo), daily = daily, shared = shared }
   -- デイリーの段を出しているときだけ、メモの段からデイリーを外す
   local separate = vim.tbl_contains(sections(), "daily")
   if daily_expanded == nil then

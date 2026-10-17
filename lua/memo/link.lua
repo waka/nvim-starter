@@ -91,11 +91,29 @@ end
 
 --- タイトルのメモを開く（なければ作る）
 function M.open_title(title, heading)
-  local path = store.path_for(title)
-  if store.exists(path) then
+  local from_shared = store.is_shared_path(vim.api.nvim_buf_get_name(0))
+  -- 今いる側（個人 / 共有）を先に探し、なければもう一方
+  local candidates = { store.path_for(title) }
+  if store.shared_enabled() then
+    local sp = store.path_for(title, store.shared_dir())
+    if from_shared then
+      table.insert(candidates, 1, sp)
+    else
+      table.insert(candidates, sp)
+    end
+  end
+  local path
+  for _, p in ipairs(candidates) do
+    if store.exists(p) then
+      path = p
+      break
+    end
+  end
+  if path then
     vim.cmd.edit(vim.fn.fnameescape(path))
   elseif opts().create_missing then
-    require("memo").new("memo", title)
+    -- 共有メモからのリンクなら共有に作る（ほかの人も開けるように）
+    require("memo").new("memo", title, { shared = from_shared })
   else
     vim.notify(("memo: 「%s」はまだありません"):format(title), vim.log.levels.WARN)
     return

@@ -84,12 +84,12 @@ function M.list(kind, opts)
       display = function(e)
         local it = e.value
         if kind == "memo" then
-          return displayer({ { os.date("%Y-%m-%d", it.mtime), "TelescopeResultsComment" }, it.title })
+          return displayer({ { os.date("%Y-%m-%d", it.mtime), "TelescopeResultsComment" }, it.title .. (it.shared and " ［共有］" or "") })
         end
         local done = store.is_complete(it)
         return displayer({
           { ("%d/%d"):format(it.done, it.total), done and "TelescopeResultsComment" or "TelescopeResultsNumber" },
-          { it.title, done and "TelescopeResultsComment" or nil },
+          { it.title .. (it.shared and " ［共有］" or ""), done and "TelescopeResultsComment" or nil },
         })
       end,
     }
@@ -269,7 +269,7 @@ function M.pick_title(o)
             ordinal = item.title,
             filename = item.path,
             display = function()
-              return displayer({ { item.type == "todo" and "ToDo" or "Memo", "TelescopeResultsComment" }, item.title })
+              return displayer({ { item.type == "todo" and "ToDo" or "Memo", "TelescopeResultsComment" }, item.title .. (item.shared and " ［共有］" or "") })
             end,
           }
         end,
