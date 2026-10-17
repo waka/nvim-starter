@@ -664,6 +664,8 @@ do
   local function open_project(dir)
     vim.cmd 'tabnew'
     vim.cmd('tcd ' .. vim.fn.fnameescape(dir))
+    -- ツリーも開いておく（カーソルは右側の空バッファに残す）
+    require('neo-tree.command').execute { action = 'show', source = 'filesystem', dir = vim.fn.getcwd() }
   end
 
   local function pick_project()

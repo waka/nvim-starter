@@ -16,6 +16,20 @@ Windows 向けの個人用 Neovim 設定です。[kickstart.nvim](https://github
 | make（任意） | あれば `telescope-fzf-native.nvim` を入れてビルドする |
 | [Claude Code](https://claude.com/claude-code)（任意） | `:MTClaude` |
 
+winget でまとめて入れる場合:
+
+```powershell
+winget install --id Neovim.Neovim -e
+winget install --id Git.Git -e
+winget install --id BurntSushi.ripgrep.MSVC -e
+winget install --id sharkdp.fd -e
+winget install --id Microsoft.PowerShell -e   # pwsh
+winget install --id ezwinports.make -e        # 任意
+winget install --id Anthropic.ClaudeCode -e   # 任意
+```
+
+入れたあとはターミナルを開き直して PATH を反映させます。
+
 ## インストール
 
 ```powershell
@@ -139,7 +153,7 @@ LSP サーバーの設定は入っていません。フォーマッタも未登�
 
 タブ 1 つを 1 プロジェクトとして使います。scope.nvim によりバッファ一覧はタブごとに分かれます。
 
-- `:Project` / `<leader>sp` … `project_roots` 以下 2 階層のフォルダから選び、新しいタブで開いて `:tcd` する
+- `:Project` / `<leader>sp` … `project_roots` 以下 2 階層のフォルダから選び、新しいタブで開いて `:tcd` し、neo-tree も開く
 - `:Project <path>` … 指定したフォルダを同じように開く
 
 タブの移動と削除は Neovim 標準の操作を使います（専用のキーマップは設定していません）。
