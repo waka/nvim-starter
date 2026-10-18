@@ -616,6 +616,11 @@ do
   require('neo-tree').setup {
     sources = { 'filesystem', 'buffers', 'git_status', 'wslremote.neotree' },
     filesystem = {
+      -- 「.」始まりのファイル・フォルダも表示する（.git だけは隠す。H で切り替え）
+      filtered_items = {
+        hide_dotfiles = false,
+        hide_by_name = { '.git' },
+      },
       window = {
         mappings = { ['\\\\'] = 'close_window' },
       },
@@ -648,6 +653,11 @@ do
   vim.o.shellquote = ''
   vim.o.shellxquote = ''
   vim.cmd([[cnoreabbrev <expr> terminal getcmdtype() == ':' && getcmdline() == 'terminal' ? 'botright 15split \| terminal' : 'terminal']])
+  -- ターミナル（:terminal、:Claude、:MTClaude）はタブラインやバッファ一覧に出さない
+  vim.api.nvim_create_autocmd('TermOpen', {
+    group = vim.api.nvim_create_augroup('custom-term-unlist', { clear = true }),
+    callback = function(ev) vim.bo[ev.buf].buflisted = false end,
+  })
 
   -- NOTE: You can add your own plugins, configuration, etc. in `lua/custom/plugins/*.lua`.
   require 'custom.plugins'
