@@ -666,10 +666,18 @@ do
   vim.pack.add { gh 'tiagovla/scope.nvim' }
   require('scope').setup {}
 
-  -- Search directories
-  local project_roots = {
-    'C:/Users/ywaka',
-  }
+  -- :Project / <leader>p で探すフォルダ（複数可。nil か空ならホームディレクトリ）
+  -- 例: local project_roots = { '~', 'D:/work' }
+  local project_roots = nil
+
+  local function get_project_roots()
+    local roots = {}
+    for _, root in ipairs(project_roots or {}) do
+      table.insert(roots, vim.fs.normalize(vim.fn.expand(root)))
+    end
+    if #roots == 0 then roots = { vim.fs.normalize(vim.fn.expand '~') } end
+    return roots
+  end
 
   local function open_project(dir)
     vim.cmd 'tabnew'
@@ -686,7 +694,7 @@ do
     local action_state = require 'telescope.actions.state'
 
     local cmd = { 'fd', '--type', 'd', '--max-depth', '2', '.' }
-    vim.list_extend(cmd, project_roots)
+    vim.list_extend(cmd, get_project_roots())
 
     pickers.new({}, {
       prompt_title = 'Open Project',
@@ -711,6 +719,7 @@ do
     end
   end, { nargs = '?', complete = 'dir' })
 
+  vim.keymap.set('n', '<leader>p', pick_project, { desc = 'Open [P]roject in new tab' })
   vim.keymap.set('n', '<leader>sp', pick_project, { desc = '[S]earch [P]rojects' })
 
   -- Zonvie (Neovim GUI)

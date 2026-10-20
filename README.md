@@ -48,7 +48,7 @@ nvim
 
 パスを直接書いているところが 2 つあります。
 
-- `init.lua` の `project_roots`（`:Project` が探すフォルダ。既定は `C:/Users/ywaka`）
+- `init.lua` の `project_roots`（`:Project` / `<leader>p` が探すフォルダ。`{ '~', 'D:/work' }` のように複数書ける。`nil` か空ならホームディレクトリ）
 - `lua/custom/plugins/memo.lua` の `dir`（メモの保存先。既定は `C:/Users/ywaka/notes`）
 
 Nerd Font を使う場合は `init.lua` 冒頭の `vim.g.have_nerd_font` を `true` にします。
@@ -155,7 +155,7 @@ neo-tree は「.」始まりのファイル・フォルダも表示します（`
 
 タブ 1 つを 1 プロジェクトとして使います。scope.nvim によりバッファ一覧はタブごとに分かれます。ターミナル（`:terminal`、`:Claude`、`:MTClaude`）などファイル以外のバッファはタブラインやバッファ一覧に出しません。
 
-- `:Project` / `<leader>sp` … `project_roots` 以下 2 階層のフォルダから選び、新しいタブで開いて `:tcd` し、neo-tree も開く
+- `:Project` / `<leader>p` / `<leader>sp` … `project_roots`（既定はホームディレクトリ）以下 2 階層のフォルダから選び、新しいタブで開いて `:tcd` し、neo-tree も開く
 - `:Project <path>` … 指定したフォルダを同じように開く
 
 タブの移動と削除は Neovim 標準の操作を使います（専用のキーマップは設定していません）。
