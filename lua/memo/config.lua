@@ -7,6 +7,8 @@ M.defaults = {
   daily_format = "%Y-%m-%d",
   -- frontmatter の created に入れる日時
   created_format = "%Y-%m-%d %H:%M",
+  -- ファイルを指定せずに Neovim を起動したら、dir をカレントディレクトリにして一覧ペイン（:MT）を開く
+  open_on_startup = false,
   -- frontmatter の title を書き換えて保存したら、ファイル名も追従させる
   sync_filename = true,
   -- チェックボックス切り替え（メモディレクトリ内の markdown バッファで有効）

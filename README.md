@@ -48,8 +48,8 @@ nvim
 
 パスを直接書いているところが 2 つあります。
 
-- `init.lua` の `project_roots`（`:Project` / `<leader>p` が探すフォルダ。`{ '~', 'D:/work' }` のように複数書ける。`nil` か空ならホームディレクトリ）
-- `lua/custom/plugins/memo.lua` の `dir`（メモの保存先。既定は `C:/Users/ywaka/notes`）
+- `init.lua` の `project_roots`（`:Project` / `<leader>p` が探すフォルダ。既定は `{ '~', '~/src/github.com' }`。`{ '~', 'D:/work' }` のように複数書ける。存在しないフォルダは飛ばし、どれもなければホームディレクトリ）
+- `lua/custom/plugins/memo.lua` の `dir`（メモの保存先。既定は `~/notes`）
 
 Nerd Font を使う場合は `init.lua` 冒頭の `vim.g.have_nerd_font` を `true` にします。
 
@@ -216,7 +216,7 @@ created: 2026-10-12 09:00
 | `:Memo l` / `:Todo l` | リンクを挿入 |
 | `:Memo b` / `:Todo b` | 開いているメモへのバックリンク |
 | `:Memo s` / `:Todo s` | 開いているメモを共有に移す / 個人に戻す |
-| `:MT` | 左側の一覧ペインを開閉 |
+| `:MT` | 左側の一覧ペインを開閉（`open_on_startup = true` なら、ファイルを指定せずに起動したときにメモのフォルダへ移って自動で開く） |
 | `:MTSync` | git リモートと同期（共有のリポジトリも） |
 | `:MTSync init <URL>` | メモのフォルダをリポジトリにしてリモートへつなぐ |
 | `:MTSync init-shared <URL>` | 共有フォルダ（`shared/`）をリポジトリにしてリモートへつなぐ |
@@ -403,9 +403,49 @@ notes/                  個人のリポジトリ（:MTSync init）
 ```lua
 require('memo').setup {
   dir = '~/notes',
+  open_on_startup = true, -- ファイル指定なしで起動したら、メモのフォルダを cwd にして一覧ペインを開く
   sync = { delay = 30 },
   shared = { sync = { poll = 60 } },
   claude = { layout = 'float' },
   sidebar = { sections = { 'memo', 'daily', 'todo' } },
 }
 ```
+
+## GUI アプリとして使う場合
+
+[Zonvie](https://github.com/akiyosi/zonvie) は Zig で書かれた Neovim の GUI です。Windows では Direct3D 11 と DirectWrite で描画し、ターミナルを通さずにこの設定をそのまま使えます。中で動くのは普通の `nvim` なので、上の「必要なもの」を入れておけば追加の設定は要りません。
+
+`init.lua` の最後に Zonvie 用の処理があり、Zonvie で起動したとき（`vim.g.zonvie_channel` があるとき）だけウィンドウを 140 桁 × 50 行にします。
+
+### インストール
+
+winget にはないので、[Releases](https://github.com/akiyosi/zonvie/releases) から `zonvie-v<バージョン>-windows-x64.zip` を落とします。中身は `zonvie.exe` 1 つだけなので、好きな場所に置きます。
+
+```powershell
+# 例: %LOCALAPPDATA%\Programs\zonvie に置く（ファイル名はダウンロードした版に合わせる）
+$dest = "$env:LOCALAPPDATA\Programs\zonvie"
+Expand-Archive "$env:USERPROFILE\Downloads\zonvie-v0.4.1-windows-x64.zip" $dest -Force
+& "$dest\zonvie.exe"
+```
+
+タスクバーから起動したい場合は `zonvie.exe` を開いてピン留めします。コマンドラインから `zonvie` で起動したい場合は、置いたフォルダを PATH に足します。
+
+### 設定ファイル
+
+`%APPDATA%\zonvie\config.toml` です（なければ `%USERPROFILE%\.config\zonvie\config.toml`）。初回起動時に既定の内容で自動的に作られます。
+
+最低限の例:
+
+```toml
+[neovim]
+path = "nvim"          # nvim.exe のパス。PATH にあれば "nvim" のままでよい
+
+[font]
+family = "HackGen Console NF"   # 好きなフォント（Nerd Font なら init.lua の have_nerd_font も true に）
+size = 14
+
+[tabline]
+external = false       # true にすると Zonvie 側のタブ表示になり、mini.tabline のバッファ一覧が出なくなる
+```
+
+ほかの項目（背景の透過、スクロールバー、IME など）は Zonvie の README の「Configuration Options」を参照してください。

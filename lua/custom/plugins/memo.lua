@@ -1,3 +1,4 @@
 require('memo').setup {
-  dir = 'C:/Users/ywaka/notes'
+  dir = '~/notes',
+  open_on_startup = true,
 }

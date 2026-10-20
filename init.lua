@@ -666,14 +666,15 @@ do
   vim.pack.add { gh 'tiagovla/scope.nvim' }
   require('scope').setup {}
 
-  -- :Project / <leader>p で探すフォルダ（複数可。nil か空ならホームディレクトリ）
+  -- :Project / <leader>p で探すフォルダ（複数可。存在しないフォルダは飛ばす。どれもなければホームディレクトリ）
   -- 例: local project_roots = { '~', 'D:/work' }
-  local project_roots = nil
+  local project_roots = { '~', '~/src/github.com' }
 
   local function get_project_roots()
     local roots = {}
     for _, root in ipairs(project_roots or {}) do
-      table.insert(roots, vim.fs.normalize(vim.fn.expand(root)))
+      local dir = vim.fs.normalize(vim.fn.expand(root))
+      if vim.fn.isdirectory(dir) == 1 then table.insert(roots, dir) end
     end
     if #roots == 0 then roots = { vim.fs.normalize(vim.fn.expand '~') } end
     return roots

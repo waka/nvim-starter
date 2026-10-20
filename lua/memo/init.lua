@@ -129,6 +129,20 @@ local function complete(subs)
   end
 end
 
+--- ファイル指定なしで起動し、dir があればそこへ移って一覧ペインを開く
+local function startup()
+  if vim.fn.argc() > 0 or vim.api.nvim_buf_get_name(0) ~= "" or vim.bo.modified then
+    return
+  end
+  local dir = config.options.dir
+  if vim.fn.isdirectory(dir) == 0 then
+    return
+  end
+  vim.cmd.cd(vim.fn.fnameescape(dir))
+  git.pull_once()
+  sidebar.open()
+end
+
 function M.setup(opts)
   config.setup(opts)
 
@@ -197,6 +211,13 @@ function M.setup(opts)
     end,
   })
   git.start_poll()
+  if config.options.open_on_startup then
+    if vim.v.vim_did_enter == 1 then
+      startup()
+    else
+      vim.api.nvim_create_autocmd("VimEnter", { group = group, once = true, callback = startup })
+    end
+  end
   vim.api.nvim_create_autocmd("VimLeavePre", {
     group = group,
     callback = function()
