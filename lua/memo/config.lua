@@ -26,7 +26,7 @@ M.defaults = {
   },
   -- git 同期（dir が git リポジトリのときだけ動く）
   sync = {
-    auto = true, -- 変更のたびに自動で commit / pull / push
+    auto = true, -- 自動で commit / pull / push（false で起動時・終了時も含めて止め、:MTSync の手動同期だけにする）
     delay = 10, -- 最後の変更から何秒待って同期するか
     pull_on_open = true, -- セッションで最初に :Memo / :Todo / :MT を使ったとき pull
     push_on_exit = true, -- Neovim 終了時に未送信の変更を push
@@ -41,7 +41,7 @@ M.defaults = {
     dir = "shared", -- 管理フォルダの中のフォルダ名
     label = "共有", -- 一覧ペインの見出し
     sync = {
-      auto = true,
+      auto = true, -- 自動同期（false で保存後・定期・フォーカス時・起動時・終了時を止め、:MTSync の手動同期だけにする）
       delay = 5, -- 最後の変更から何秒待って同期するか
       poll = 120, -- 何秒おきにほかの人の変更を取り込むか（0 で無効）
       pull_on_open = true,

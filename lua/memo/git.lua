@@ -609,8 +609,9 @@ function M.start_poll()
   if not shared_enabled() then
     return
   end
-  local interval = config.options.shared.sync.poll
-  if not interval or interval <= 0 then
+  local o = config.options.shared.sync
+  local interval = o.poll
+  if not o.auto or not interval or interval <= 0 then
     return
   end
   if not poll_timer then
@@ -626,7 +627,7 @@ end
 
 --- Neovim に戻ってきたとき（30 秒以上たっていれば）共有を同期
 function M.on_focus()
-  if not shared_enabled() or not M.shared:is_repo() then
+  if not shared_enabled() or not config.options.shared.sync.auto or not M.shared:is_repo() then
     return
   end
   if vim.uv.now() - M.shared.state.last_sync > 30000 then
